@@ -220,11 +220,17 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const gameWrapper = document.getElementById('game-wrapper');
+const mainMenu = document.getElementById('main-menu');
+const gameOverScreen = document.getElementById('game-over');
+const levelCompleteScreen = document.getElementById('level-complete');
+const gameWinScreen = document.getElementById('game-win');
+const hud = document.getElementById('hud');
 
 let gameState = 'menu';
 let currentLevel = 1;
 let score = 0;
-let highScore = localStorage.getItem('blackCatHighScore') || 0;
+let highScoreDisplayVal = localStorage.getItem('blackCatHighScore');
+let highScore = highScoreDisplayVal ? parseInt(highScoreDisplayVal) : 0;
 
 // Entities
 let player = {
@@ -292,6 +298,9 @@ function loadLevel(level) {
     } else if (level === 2) {
         gameWrapper.style.backgroundColor = '#FFA07A';
         platforms.push({x:0, y:500, width:400, height:100, type:'solid'});
+        // Adding a spring to Level 2
+        springs.push({x:330, y:480, width:40, height:20, force:-18});
+        
         platforms.push({x:500, y:350, width:150, height:20, type:'moving', vx:2, minX:450, maxX:750});
         platforms.push({x:850, y:500, width:600, height:100, type:'solid'});
         enemies.push({x:900, y:460, vx:3, minX:850, maxX:1200});
@@ -337,10 +346,14 @@ function loadLevel(level) {
         gameWrapper.style.backgroundColor = '#2c3e50';
         platforms.push({x:0, y:500, width:200, height:100, type:'solid'});
         springs.push({x:100, y:480, width:40, height:20, force:-25});
-        platforms.push({x:300, y:200, width:100, height:20, type:'solid'});
-        springs.push({x:330, y:180, width:40, height:20, force:-25});
-        platforms.push({x:600, y:100, width:100, height:20, type:'solid'});
-        goal.x = 650; goal.y = 40;
+        
+        // Dynamic platforms
+        for(let i=1; i<=8; i++) {
+            platforms.push({x: i * 200, y: 500, width: 50, height: 20, type: 'solid'});
+            if (i % 3 === 0) springs.push({x: i * 200 + 5, y: 480, width: 40, height: 20, force: -20});
+            if (i % 2 === 0) enemies.push({x: i * 200 + 5, y: 460, vx: 2, minX: i * 200, maxX: i * 200 + 45 });
+        }
+        goal.x = 1800; goal.y = 440;
     } else if (level === 9) {
         gameWrapper.style.backgroundColor = '#1a1a1a';
         platforms.push({x:0, y:500, width:800, height:100, type:'solid'});
@@ -451,34 +464,53 @@ function update() {
 
 // --- RENDERING ---
 
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+function drawBackground() {
     let sx = camera.x;
-
-    // Background Contrast Buildings & Parallax
-    if (currentLevel >= 3) {
+    if (currentLevel === 1) {
+        // Day
+        for (let i = 0; i < 5; i++) drawMountain((i * 500) - (sx * 0.1) % 500, 600, 300, 200, '#95D061');
+    } else if (currentLevel === 2) {
+        // Sunset
+        for (let i = 0; i < 5; i++) drawMountain((i * 500) - (sx * 0.1) % 500, 600, 350, 250, '#800080');
+    } else if (currentLevel >= 3) {
+        // Night/Special
         ctx.fillStyle = 'white';
         stars.forEach(s => {
-            let x = (s.x - sx * 0.1) % 800; if (x < 0) x += 800;
+            let x = (s.x - sx * 0.05) % 800; if (x < 0) x += 800;
             ctx.fillRect(x, s.y, s.size, s.size);
         });
-        // Vibrant Buildings to Contrast with Black Cat
-        for(let i=0; i<6; i++) {
-            ctx.fillStyle = (currentLevel >= 6) ? '#2c2c54' : '#1e1e2f';
-            let bx = (i*250 - sx*0.2) % 1500;
-            ctx.fillRect(bx, 100, 150, 500);
-            ctx.fillStyle = '#fffa65'; // Windows
-            ctx.fillRect(bx + 20, 150, 10, 10); ctx.fillRect(bx + 110, 200, 10, 10);
+        for (let i = 0; i < 6; i++) {
+            let bx = (i * 250 - sx * 0.1) % 1500;
+            // Contrast buildings: Slightly lighter than the black cat
+            ctx.fillStyle = (currentLevel >= 6) ? '#444466' : '#333344';
+            ctx.fillRect(bx, 200, 150, 400);
+            // Window outlines for better visibility
+            ctx.strokeStyle = '#555577';
+            ctx.strokeRect(bx, 200, 150, 400);
+            
+            ctx.fillStyle = '#fffa65';
+            if (i % 2 === 0) ctx.fillRect(bx + 20, 250, 10, 10);
+            if (i % 3 === 0) ctx.fillRect(bx + 110, 350, 10, 10);
         }
-    } else {
-        clouds.forEach(c => {
-            ctx.fillStyle = 'white'; ctx.globalAlpha = 0.5;
-            let cx = (c.x - sx * 0.3) % 2000; if (cx < -150) cx += 2000;
-            ctx.fillRect(cx, c.y, c.w, c.h); ctx.globalAlpha = 1;
-        });
     }
+}
 
-    ctx.save(); ctx.translate(-camera.x, 0);
+function drawMountain(x, y, w, h, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2, y);
+    ctx.lineTo(x, y - h);
+    ctx.lineTo(x + w / 2, y);
+    ctx.fill();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    drawBackground();
+    
+    ctx.save();
+    ctx.translate(-camera.x, 0);
 
     // Platforms
     platforms.forEach(p => {
@@ -525,32 +557,44 @@ function draw() {
 function updateHUD() {
     document.getElementById('scoreDisplay').innerText = `🐟 ${score}`;
     document.getElementById('levelDisplay').innerText = `Level ${currentLevel}`;
-    document.getElementById('highScoreDisplay').innerText = `🏆 ${Math.max(score, highScore)}`;
+    let displayHighScore = Math.max(score, highScore);
+    document.getElementById('highScoreDisplay').innerText = `🏆 ${displayHighScore}`;
 }
 
 function startGame() {
     score = 0; currentLevel = 1; gameState = 'playing';
-    mainMenu.classList.add('hidden'); gameOverScreen.classList.add('hidden'); gameWinScreen.classList.add('hidden');
-    hud.classList.remove('hidden'); document.getElementById('mobile-controls').classList.remove('hidden');
-    loadLevel(currentLevel); updateHUD();
+    mainMenu.classList.add('hidden'); 
+    gameOverScreen.classList.add('hidden'); 
+    gameWinScreen.classList.add('hidden');
+    levelCompleteScreen.classList.add('hidden');
+    hud.classList.remove('hidden'); 
+    document.getElementById('mobile-controls').classList.remove('hidden');
+    loadLevel(currentLevel); 
+    updateHUD();
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     loop();
 }
 
 function gameOver() {
-    gameState = 'gameover'; gameOverScreen.classList.remove('hidden');
+    gameState = 'gameover'; 
+    gameOverScreen.classList.remove('hidden');
     document.getElementById('mobile-controls').classList.add('hidden');
 }
 
 function levelComplete() {
-    if (currentLevel >= 10) {
-        gameState = 'win'; gameWinScreen.classList.remove('hidden');
-        document.getElementById('final-score').innerText = `Total Ikan: ${score}`;
-        if (score > highScore) localStorage.setItem('blackCatHighScore', score);
-    } else {
-        gameState = 'levelcomplete'; levelCompleteScreen.classList.remove('hidden');
-    }
+    gameState = 'levelcomplete';
     document.getElementById('mobile-controls').classList.add('hidden');
+    if (currentLevel >= 10) {
+        gameState = 'win'; 
+        gameWinScreen.classList.remove('hidden');
+        document.getElementById('final-score').innerText = `Total Ikan: ${score}`;
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('blackCatHighScore', score);
+        }
+    } else {
+        levelCompleteScreen.classList.remove('hidden');
+    }
 }
 
 function nextLevel() {
@@ -569,12 +613,24 @@ function createParticles(x, y, color) {
     for (let i = 0; i < 8; i++) particles.push({ x, y, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, life: 1, color });
 }
 
-document.getElementById('start-btn').onclick = startGame;
-document.getElementById('restart-btn').onclick = startGame;
-document.getElementById('next-level-btn').onclick = nextLevel;
-document.getElementById('play-again-btn').onclick = startGame;
-document.getElementById('home-btn-go').onclick = () => location.reload();
-document.getElementById('home-btn-win').onclick = () => location.reload();
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+document.getElementById('next-level-btn').addEventListener('click', nextLevel);
+document.getElementById('play-again-btn').addEventListener('click', startGame);
+document.getElementById('home-btn-go').addEventListener('click', () => {
+    gameState = 'menu';
+    gameOverScreen.classList.add('hidden');
+    mainMenu.classList.remove('hidden');
+    hud.classList.add('hidden');
+    document.getElementById('mobile-controls').classList.add('hidden');
+});
+document.getElementById('home-btn-win').addEventListener('click', () => {
+    gameState = 'menu';
+    gameWinScreen.classList.add('hidden');
+    mainMenu.classList.remove('hidden');
+    hud.classList.add('hidden');
+    document.getElementById('mobile-controls').classList.add('hidden');
+});
 
 // Final initial draw
 ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, 800, 600);
