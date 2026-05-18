@@ -1,0 +1,5 @@
+{
+  "name": "Black Cat Escape",
+  "description": "A 2D browser-based platformer game where you play as a Black Cat escaping from Dogs.",
+  "requestFramePermissions": []
+}

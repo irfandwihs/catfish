@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black Cat Escape</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a2e;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 4/3;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            border-radius: 12px;
+            overflow: hidden;
+            background-color: #87CEEB;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: auto;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .screen {
+            background: rgba(15, 15, 25, 0.9);
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            pointer-events: auto;
+            box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+            border: 2px solid #333;
+            max-width: 80%;
+        }
+        h1 {
+            margin-top: 0;
+            font-size: clamp(24px, 5vw, 48px);
+            color: #FFD700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            margin-bottom: 10px;
+        }
+        p {
+            font-size: clamp(14px, 2.5vw, 18px);
+            line-height: 1.6;
+            margin: 10px 0;
+        }
+        .controls {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: inline-block;
+            text-align: left;
+        }
+        button {
+            background-color: #FF8C00;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: clamp(16px, 3vw, 24px);
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-weight: bold;
+            transition: transform 0.1s, background-color 0.2s;
+            box-shadow: 0 4px 0 #CC7000;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #FFA500;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #CC7000;
+        }
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #CC7000;
+        }
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: clamp(16px, 3vw, 24px);
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+        .hidden {
+            display: none !important;
+        }
+        #mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #mobile-controls button {
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 5px;
+            box-shadow: none;
+            padding: 0;
+            backdrop-filter: blur(4px);
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #mobile-controls button:active {
+            background: rgba(255, 255, 255, 0.5);
+            transform: scale(0.95);
+        }
+        .d-pad { display: flex; }
+        .action-pad { display: flex; }
+        
+        @media (min-width: 769px) {
+            #mobile-controls {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div id="hud" class="hidden">
+        <div id="scoreDisplay">🐟 0</div>
+        <div id="levelDisplay">Level 1</div>
+        <div id="highScoreDisplay">🏆 0</div>
+    </div>
+    
+    <div id="ui-layer">
+        <div id="main-menu" class="screen">
+            <h1>🐈⬛ Black Cat Escape</h1>
+            <p>Bantu Kucing Hitam melarikan diri dari kejaran Anjing!</p>
+            <div class="controls">
+                <strong>Kontrol:</strong><br>
+                ⬅️ ➡️ / A D : Bergerak<br>
+                ⬆️ / W / Spasi : Melompat
+            </div>
+            <p>Kumpulkan Ikan 🐟 dan capai Pintu 🚪!</p>
+            <button id="start-btn">Start Game</button>
+        </div>
+
+        <div id="game-over" class="screen hidden">
+            <h1 style="color: #FF4444;">Game Over!</h1>
+            <p>Kamu tertangkap oleh Anjing 🐕</p>
+            <button id="restart-btn">Coba Lagi</button>
+            <button id="home-btn-go" style="background-color: #444; box-shadow: 0 4px 0 #222;">Menu Utama</button>
+        </div>
+
+        <div id="level-complete" class="screen hidden">
+            <h1 style="color: #4CAF50;">Level Selesai!</h1>
+            <p>Bagus! Bersiap untuk level berikutnya...</p>
+            <button id="next-level-btn">Lanjut</button>
+        </div>
+
+        <div id="game-win" class="screen hidden">
+            <h1 style="color: #FFD700;">Kamu Menang!</h1>
+            <p>Kucing Hitam berhasil lolos dari semua tantangan!</p>
+            <p id="final-score" style="font-size: 24px; font-weight: bold; color: #87CEEB;">Total Ikan: 0</p>
+            <button id="play-again-btn">Main Lagi</button>
+            <button id="home-btn-win" style="background-color: #444; box-shadow: 0 4px 0 #222;">Menu Utama</button>
+        </div>
+    </div>
+    
+    <div id="mobile-controls" class="hidden">
+        <div class="d-pad">
+            <button id="btn-left">⬅️</button>
+            <button id="btn-right">➡️</button>
+        </div>
+        <div class="action-pad">
+            <button id="btn-jump">⬆️</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- CONFIGURATION & STATE ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const gameWrapper = document.getElementById('game-wrapper');
+
+let gameState = 'menu';
+let currentLevel = 1;
+let score = 0;
+let highScore = localStorage.getItem('blackCatHighScore') || 0;
+
+// Entities
+let player = {
+    x: 50, y: 300, width: 40, height: 40,
+    vx: 0, vy: 0, speed: 6, jumpForce: -13, gravity: 0.6,
+    grounded: false, facingRight: true
+};
+
+let platforms = [];
+let enemies = [];
+let collectibles = [];
+let springs = [];
+let particles = [];
+let goal = { x: 0, y: 0, width: 50, height: 60 };
+let camera = { x: 0, y: 0 };
+let stars = [];
+let clouds = [];
+let animationFrameId;
+
+// Sprites
+const catImg = new Image();
+catImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M15 40 Q 5 40 5 20" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><rect x="15" y="30" width="30" height="20" rx="10" fill="#222"/><rect x="20" y="45" width="6" height="15" rx="3" fill="#222"/><rect x="35" y="45" width="6" height="15" rx="3" fill="#222"/><circle cx="45" cy="25" r="15" fill="#222"/><path d="M35 15 L40 5 L48 15 Z" fill="#222"/><path d="M45 15 L55 5 L55 15 Z" fill="#222"/><circle cx="50" cy="22" r="3" fill="#FFD700"/><circle cx="51" cy="22" r="1" fill="#000"/></svg>');
+
+const dogImg = new Image();
+dogImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M15 35 Q 5 35 10 25" fill="none" stroke="#8B4513" stroke-width="6" stroke-linecap="round"/><rect x="15" y="25" width="35" height="20" rx="8" fill="#8B4513"/><rect x="20" y="40" width="6" height="20" rx="3" fill="#8B4513"/><rect x="40" y="40" width="6" height="20" rx="3" fill="#8B4513"/><rect x="40" y="15" width="20" height="20" rx="6" fill="#8B4513"/><rect x="50" y="25" width="12" height="10" rx="4" fill="#A0522D"/><circle cx="60" cy="27" r="2" fill="#000"/><path d="M42 15 Q 35 25 42 30 Z" fill="#5C2E0B"/><circle cx="48" cy="20" r="2" fill="#000"/></svg>');
+
+// Input
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.key] = true; keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keyup', e => { keys[e.key] = false; keys[e.key.toLowerCase()] = false; });
+
+const setupTouch = (id, key) => {
+    const btn = document.getElementById(id);
+    const start = e => { e.preventDefault(); keys[key] = true; };
+    const end = e => { e.preventDefault(); keys[key] = false; };
+    btn.addEventListener('touchstart', start); btn.addEventListener('touchend', end);
+    btn.addEventListener('mousedown', start); btn.addEventListener('mouseup', end); btn.addEventListener('mouseleave', end);
+};
+setupTouch('btn-left', 'ArrowLeft'); setupTouch('btn-right', 'ArrowRight'); setupTouch('btn-jump', 'ArrowUp');
+
+// --- LEVEL DESIGN ---
+
+function setupBackground(level) {
+    stars = []; clouds = [];
+    if (level >= 3) {
+        for(let i=0; i<50; i++) stars.push({x:Math.random()*2000, y:Math.random()*400, size:Math.random()*2+1});
+    } else {
+        for(let i=0; i<8; i++) clouds.push({x:Math.random()*2000, y:Math.random()*150, w:Math.random()*100+50, h:Math.random()*40+20});
+    }
+}
+
+function loadLevel(level) {
+    platforms = []; enemies = []; collectibles = []; springs = []; particles = [];
+    setupBackground(level);
+    player.x = 50; player.y = 300; player.vx = 0; player.vy = 0;
+    
+    if (level === 1) {
+        gameWrapper.style.backgroundColor = '#87CEEB';
+        platforms.push({x:0, y:500, width:1500, height:100, type:'solid'});
+        platforms.push({x:300, y:400, width:150, height:20, type:'solid'});
+        platforms.push({x:550, y:300, width:150, height:20, type:'solid'});
+        collectibles.push({x:360, y:350, id:1}, {x:610, y:250, id:2});
+        enemies.push({x:600, y:460, vx:2, minX:400, maxX:800});
+        goal.x = 1300; goal.y = 440;
+    } else if (level === 2) {
+        gameWrapper.style.backgroundColor = '#FFA07A';
+        platforms.push({x:0, y:500, width:400, height:100, type:'solid'});
+        platforms.push({x:500, y:350, width:150, height:20, type:'moving', vx:2, minX:450, maxX:750});
+        platforms.push({x:850, y:500, width:600, height:100, type:'solid'});
+        enemies.push({x:900, y:460, vx:3, minX:850, maxX:1200});
+        goal.x = 1300; goal.y = 440;
+    } else if (level === 3) {
+        gameWrapper.style.backgroundColor = '#191970';
+        platforms.push({x:0, y:500, width:300, height:100, type:'solid'});
+        springs.push({x:250, y:480, width:40, height:20, force:-20});
+        platforms.push({x:400, y:250, width:200, height:20, type:'solid'});
+        platforms.push({x:700, y:450, width:500, height:150, type:'solid'});
+        enemies.push({x:800, y:410, vx:5, minX:700, maxX:1100});
+        goal.x = 1100; goal.y = 390;
+    } else if (level === 4) {
+        gameWrapper.style.backgroundColor = '#2E8B57';
+        platforms.push({x:0, y:500, width:200, height:100, type:'solid'});
+        platforms.push({x:300, y:300, width:100, height:20, type:'moving', vy:3, minY:200, maxY:500});
+        platforms.push({x:500, y:200, width:100, height:20, type:'moving', vx:3, minX:400, maxX:800});
+        platforms.push({x:900, y:400, width:400, height:100, type:'solid'});
+        springs.push({x:950, y:380, width:40, height:20, force:-22});
+        goal.x = 1200; goal.y = 340;
+    } else if (level === 5) {
+        gameWrapper.style.backgroundColor = '#4B0082';
+        platforms.push({x:0, y:500, width:200, height:100, type:'solid'});
+        for(let i=1; i<6; i++) platforms.push({x:i*250, y:500-(i*40), width:80, height:20, type:'solid'});
+        enemies.push({x:500, y:380, vx:4, minX:300, maxX:700});
+        goal.x = 1500; goal.y = 200;
+    } else if (level === 6) {
+        gameWrapper.style.backgroundColor = '#00008B'; // Deep Blue
+        platforms.push({x:0, y:500, width:300, height:100, type:'solid'});
+        springs.push({x:150, y:480, width:40, height:20, force:-30}); // Mega jump
+        platforms.push({x:400, y:150, width:500, height:20, type:'solid'});
+        enemies.push({x:450, y:110, vx:6, minX:400, maxX:850});
+        goal.x = 800; goal.y = 90;
+    } else if (level === 7) {
+        gameWrapper.style.backgroundColor = '#333333';
+        platforms.push({x:0, y:500, width:150, height:100, type:'solid'});
+        platforms.push({x:200, y:400, width:80, height:20, type:'moving', vy:5, minY:100, maxY:600});
+        platforms.push({x:400, y:200, width:80, height:20, type:'moving', vx:5, minX:300, maxX:700});
+        platforms.push({x:800, y:400, width:400, height:100, type:'solid'});
+        enemies.push({x:900, y:360, vx:4, minX:800, maxX:1100});
+        goal.x = 1100; goal.y = 340;
+    } else if (level === 8) {
+        gameWrapper.style.backgroundColor = '#2c3e50';
+        platforms.push({x:0, y:500, width:200, height:100, type:'solid'});
+        springs.push({x:100, y:480, width:40, height:20, force:-25});
+        platforms.push({x:300, y:200, width:100, height:20, type:'solid'});
+        springs.push({x:330, y:180, width:40, height:20, force:-25});
+        platforms.push({x:600, y:100, width:100, height:20, type:'solid'});
+        goal.x = 650; goal.y = 40;
+    } else if (level === 9) {
+        gameWrapper.style.backgroundColor = '#1a1a1a';
+        platforms.push({x:0, y:500, width:800, height:100, type:'solid'});
+        for(let i=1; i<4; i++) enemies.push({x:i*200, y:460, vx:i+3, minX:50, maxX:750});
+        platforms.push({x:850, y:350, width:200, height:20, type:'solid'});
+        goal.x = 1000; goal.y = 290;
+    } else if (level === 10) {
+        gameWrapper.style.backgroundColor = '#000000';
+        platforms.push({x:0, y:500, width:200, height:100, type:'solid'});
+        springs.push({x:50, y:480, width:40, height:20, force:-35});
+        platforms.push({x:400, y:100, width:1000, height:20, type:'solid'});
+        for(let i=0; i<5; i++) enemies.push({x:500+i*150, y:60, vx:8, minX:400, maxX:1400});
+        goal.x = 1300; goal.y = 40;
+    }
+
+    // Add extra collectibles for all levels
+    for(let i=0; i<5; i++) {
+        collectibles.push({x: 200 + i*300, y: 200 + Math.random()*200, collected:false, time:Math.random()*10});
+    }
+}
+
+// --- CORE ENGINE ---
+
+function update() {
+    if (gameState !== 'playing') return;
+
+    // Movement
+    if (keys['ArrowLeft'] || keys['a']) { player.vx = -player.speed; player.facingRight = false; }
+    else if (keys['ArrowRight'] || keys['d']) { player.vx = player.speed; player.facingRight = true; }
+    else player.vx = 0;
+
+    if ((keys['ArrowUp'] || keys['w'] || keys[' ']) && player.grounded) {
+        player.vy = player.jumpForce; player.grounded = false;
+        createParticles(player.x + 20, player.y + 40, '#fff');
+    }
+
+    player.vy += player.gravity; player.x += player.vx; player.y += player.vy;
+    if (player.y > 800) gameOver();
+
+    // Collisions
+    player.grounded = false;
+    for (let p of platforms) {
+        if (p.type === 'moving') {
+            if (p.vx) { p.x += p.vx; if (p.x < p.minX || p.x > p.maxX) p.vx *= -1; }
+            if (p.vy) { p.y += p.vy; if (p.y < p.minY || p.y > p.maxY) p.vy *= -1; }
+        }
+        if (player.x < p.x + p.width && player.x + player.width > p.x && player.y < p.y + p.height && player.y + player.height > p.y) {
+            let prevB = player.y - player.vy + player.height;
+            if (player.vy >= 0 && prevB <= p.y + 15) {
+                player.grounded = true; player.vy = 0; player.y = p.y - player.height;
+                if (p.type === 'moving' && p.vx) player.x += p.vx;
+            } else if (player.vy < 0 && player.y - player.vy >= p.y + p.height - 15) {
+                player.vy = 0; player.y = p.y + p.height;
+            } else {
+                if (player.vx > 0) player.x = p.x - player.width;
+                else if (player.vx < 0) player.x = p.x + player.width;
+            }
+        }
+    }
+
+    // Springs
+    for (let s of springs) {
+        if (player.x < s.x + s.width && player.x + player.width > s.x && player.y < s.y + s.height && player.y + player.height > s.y) {
+            if (player.vy > 0) {
+                player.vy = s.force; 
+                createParticles(s.x + 20, s.y, '#FF00FF');
+            }
+        }
+    }
+
+    // Enemies
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i]; e.x += e.vx; if (e.x < e.minX || e.x > e.maxX) e.vx *= -1;
+        if (player.x + 10 < e.x + 30 && player.x + 30 > e.x + 10 && player.y + 10 < e.y + 30 && player.y + 30 > e.y + 10) {
+            if (player.vy > 0 && (player.y - player.vy + 40) <= e.y + 20) {
+                enemies.splice(i, 1); score += 50; player.vy = -10;
+                createParticles(e.x + 20, e.y + 20, '#8B4513');
+                updateHUD();
+            } else { gameOver(); }
+        }
+    }
+
+    // Collectibles
+    for (let c of collectibles) {
+        if (!c.collected) {
+            c.time += 0.1;
+            let cy = c.y || 0; // Using fixed position or derived
+            if (player.x < c.x + 30 && player.x + 40 > c.x && player.y < c.y + 30 && player.y + 40 > c.y) {
+                c.collected = true; score += 10; updateHUD();
+                createParticles(c.x + 15, c.y + 15, '#FFD700');
+            }
+        }
+    }
+
+    // Goal
+    if (player.x < goal.x + 50 && player.x + 40 > goal.x && player.y < goal.y + 60 && player.y + 40 > goal.y) levelComplete();
+
+    // Camera
+    camera.x += (player.x - 400 - camera.x) * 0.1;
+    if (camera.x < 0) camera.x = 0;
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+}
+
+// --- RENDERING ---
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let sx = camera.x;
+
+    // Background Contrast Buildings & Parallax
+    if (currentLevel >= 3) {
+        ctx.fillStyle = 'white';
+        stars.forEach(s => {
+            let x = (s.x - sx * 0.1) % 800; if (x < 0) x += 800;
+            ctx.fillRect(x, s.y, s.size, s.size);
+        });
+        // Vibrant Buildings to Contrast with Black Cat
+        for(let i=0; i<6; i++) {
+            ctx.fillStyle = (currentLevel >= 6) ? '#2c2c54' : '#1e1e2f';
+            let bx = (i*250 - sx*0.2) % 1500;
+            ctx.fillRect(bx, 100, 150, 500);
+            ctx.fillStyle = '#fffa65'; // Windows
+            ctx.fillRect(bx + 20, 150, 10, 10); ctx.fillRect(bx + 110, 200, 10, 10);
+        }
+    } else {
+        clouds.forEach(c => {
+            ctx.fillStyle = 'white'; ctx.globalAlpha = 0.5;
+            let cx = (c.x - sx * 0.3) % 2000; if (cx < -150) cx += 2000;
+            ctx.fillRect(cx, c.y, c.w, c.h); ctx.globalAlpha = 1;
+        });
+    }
+
+    ctx.save(); ctx.translate(-camera.x, 0);
+
+    // Platforms
+    platforms.forEach(p => {
+        ctx.fillStyle = '#654321'; ctx.fillRect(p.x, p.y, p.width, p.height);
+        ctx.fillStyle = '#3CB371'; ctx.fillRect(p.x, p.y, p.width, 10);
+    });
+
+    // Springs
+    springs.forEach(s => {
+        ctx.fillStyle = '#FF00FF'; ctx.fillRect(s.x, s.y + 10, s.width, 10);
+        ctx.fillStyle = '#ccc'; ctx.fillRect(s.x + 5, s.y, s.width - 10, 10);
+    });
+
+    // Goal
+    ctx.font = '50px Arial'; ctx.fillText('🚪', goal.x, goal.y + 50);
+
+    // Collectibles
+    ctx.font = '30px Arial';
+    collectibles.forEach(c => { if(!c.collected) ctx.fillText('🐟', c.x, c.y + 20); });
+
+    // Enemies
+    enemies.forEach(e => {
+        ctx.save();
+        if (e.vx < 0) { ctx.scale(-1, 1); ctx.drawImage(dogImg, -e.x - 40, e.y, 40, 40); }
+        else ctx.drawImage(dogImg, e.x, e.y, 40, 40);
+        ctx.restore();
+    });
+
+    // Particles
+    particles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); });
+    ctx.globalAlpha = 1;
+
+    // Player
+    ctx.save();
+    if (!player.facingRight) { ctx.scale(-1, 1); ctx.drawImage(catImg, -player.x - 40, player.y, 40, 40); }
+    else ctx.drawImage(catImg, player.x, player.y, 40, 40);
+    ctx.restore();
+
+    ctx.restore();
+}
+
+// --- GAME FLOW ---
+
+function updateHUD() {
+    document.getElementById('scoreDisplay').innerText = `🐟 ${score}`;
+    document.getElementById('levelDisplay').innerText = `Level ${currentLevel}`;
+    document.getElementById('highScoreDisplay').innerText = `🏆 ${Math.max(score, highScore)}`;
+}
+
+function startGame() {
+    score = 0; currentLevel = 1; gameState = 'playing';
+    mainMenu.classList.add('hidden'); gameOverScreen.classList.add('hidden'); gameWinScreen.classList.add('hidden');
+    hud.classList.remove('hidden'); document.getElementById('mobile-controls').classList.remove('hidden');
+    loadLevel(currentLevel); updateHUD();
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    loop();
+}
+
+function gameOver() {
+    gameState = 'gameover'; gameOverScreen.classList.remove('hidden');
+    document.getElementById('mobile-controls').classList.add('hidden');
+}
+
+function levelComplete() {
+    if (currentLevel >= 10) {
+        gameState = 'win'; gameWinScreen.classList.remove('hidden');
+        document.getElementById('final-score').innerText = `Total Ikan: ${score}`;
+        if (score > highScore) localStorage.setItem('blackCatHighScore', score);
+    } else {
+        gameState = 'levelcomplete'; levelCompleteScreen.classList.remove('hidden');
+    }
+    document.getElementById('mobile-controls').classList.add('hidden');
+}
+
+function nextLevel() {
+    currentLevel++; levelCompleteScreen.classList.add('hidden');
+    document.getElementById('mobile-controls').classList.remove('hidden');
+    loadLevel(currentLevel); updateHUD(); gameState = 'playing'; loop();
+}
+
+function loop() {
+    if (gameState === 'playing') {
+        update(); draw(); animationFrameId = requestAnimationFrame(loop);
+    }
+}
+
+function createParticles(x, y, color) {
+    for (let i = 0; i < 8; i++) particles.push({ x, y, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, life: 1, color });
+}
+
+document.getElementById('start-btn').onclick = startGame;
+document.getElementById('restart-btn').onclick = startGame;
+document.getElementById('next-level-btn').onclick = nextLevel;
+document.getElementById('play-again-btn').onclick = startGame;
+document.getElementById('home-btn-go').onclick = () => location.reload();
+document.getElementById('home-btn-win').onclick = () => location.reload();
+
+// Final initial draw
+ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, 800, 600);
+</script>
+</body>
+</html>
